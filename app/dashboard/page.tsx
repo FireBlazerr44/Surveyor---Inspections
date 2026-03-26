@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Building2, ClipboardList, Plus, Search, LogOut, Home, Shield } from "lucide-react"
+import { ClipboardList, Plus, Search, Home } from "lucide-react"
+import { DashboardHeader } from "@/components/dashboard-header"
 
 export default async function DashboardPage({
   searchParams,
@@ -27,6 +28,8 @@ export default async function DashboardPage({
     .single()
 
   const isAdmin = profile?.role === "admin"
+  const userRole = profile?.role || "user"
+  const userEmail = user.email || ""
 
   const params = await searchParams
   const viewMode = params.view || "all"
@@ -54,6 +57,14 @@ export default async function DashboardPage({
 
   const { data: inspections } = await query
 
+  const { count: totalInspections } = await supabase
+    .from("inspections")
+    .select("*", { count: "exact", head: true })
+
+  const { count: totalProperties } = await supabase
+    .from("properties")
+    .select("*", { count: "exact", head: true })
+
   let propertyQuery = supabase
     .from("properties")
     .select("*")
@@ -70,33 +81,9 @@ export default async function DashboardPage({
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
-            <h1 className="text-xl font-bold">Surveyor Inspection</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            {isAdmin && (
-              <Link href="/admin/users">
-                <Button variant="ghost" size="sm">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Users
-                </Button>
-              </Link>
-            )}
-            <span className="text-sm text-muted-foreground">{user.email}</span>
-            <form action="/auth/signout" method="post">
-              <Button variant="ghost" size="sm" type="submit">
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8">
+      <DashboardHeader userEmail={userEmail} userRole={userRole} isAdmin={isAdmin} />
+      
+      <main className="container mx-auto px-4 py-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -104,7 +91,7 @@ export default async function DashboardPage({
               <Home className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{properties?.length || 0}</div>
+              <div className="text-2xl font-bold">{totalProperties || 0}</div>
             </CardContent>
           </Card>
           <Card>
@@ -113,7 +100,7 @@ export default async function DashboardPage({
               <ClipboardList className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{inspections?.length || 0}</div>
+              <div className="text-2xl font-bold">{totalInspections || 0}</div>
             </CardContent>
           </Card>
           <Card className="md:col-span-2">

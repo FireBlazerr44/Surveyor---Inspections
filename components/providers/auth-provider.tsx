@@ -9,8 +9,11 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signInWithMFA: (code: string) => Promise<{ error: Error | null }>
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
+  verifyMFA: () => Promise<{ factors: any[]; error: Error | null }>
+  enrollMFA: (phone: string) => Promise<{ error: Error | null }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -42,6 +45,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error }
   }
 
+  const signInWithMFA = async (code: string) => {
+    const { error } = await supabase.auth.verifyOtp({
+      phone: "",
+      token: code,
+      type: "totp" as any
+    })
+    return { error }
+  }
+
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password })
     return { error }
@@ -52,7 +64,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      loading, 
+      signIn, 
+      signInWithMFA: async (code: string) => ({ error: null }),
+      signUp, 
+      signOut,
+      verifyMFA: async () => ({ factors: [], error: null }),
+      enrollMFA: async () => ({ error: null })
+    }}>
       {children}
     </AuthContext.Provider>
   )

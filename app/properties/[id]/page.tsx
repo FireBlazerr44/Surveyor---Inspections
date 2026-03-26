@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, ArrowLeft, Edit, Search, MapPin, Home, Ruler, Calendar } from "lucide-react"
+import { Building2, ArrowLeft, Edit, Search, MapPin, Home, Ruler, Calendar, ExternalLink } from "lucide-react"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -74,6 +74,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                   <div className="text-muted-foreground">
                     {property.town} {property.postcode && `• ${property.postcode}`}
                   </div>
+                  {property.postcode && (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.postcode)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-secondary hover:underline mt-2"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View on Map
+                    </a>
+                  )}
                 </div>
               </CardContent>
             </Card>
