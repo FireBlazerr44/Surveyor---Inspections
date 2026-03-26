@@ -12,14 +12,6 @@ import { Building2, Shield, Loader2, AlertCircle, Copy } from "lucide-react"
 import { generateSecretForUser } from "@/lib/mfa"
 
 const MAX_ATTEMPTS = 5
-const LOCKOUT_DURATION_BASE = 60 // 1 minute in seconds
-
-function getLockoutDuration(attemptCount: number): number {
-  if (attemptCount <= 5) return 60 // 1 minute
-  if (attemptCount <= 10) return 300 // 5 minutes
-  if (attemptCount <= 15) return 900 // 15 minutes
-  return 1800 // 30 minutes
-}
 
 function getAttemptsRemainingText(remaining: number): string {
   if (remaining === 4) return "4 attempts remaining"
@@ -27,6 +19,14 @@ function getAttemptsRemainingText(remaining: number): string {
   if (remaining === 2) return "2 attempts remaining - last chance!"
   if (remaining === 1) return "1 attempt remaining"
   return ""
+}
+
+function getLockoutEnd(attemptCount: number): Date | null {
+  if (attemptCount >= MAX_ATTEMPTS) {
+    const baseMinutes = attemptCount <= 5 ? 1 : attemptCount <= 10 ? 5 : 15
+    return new Date(Date.now() + baseMinutes * 60 * 1000)
+  }
+  return null
 }
 
 function LoginForm() {
@@ -45,16 +45,26 @@ function LoginForm() {
   const [mfaQrUri, setMfaQrUri] = useState("")
   const [mfaSetupLoading, setMfaSetupLoading] = useState(false)
   const [setupError, setSetupError] = useState("")
-  const [attemptsRemaining, setAttemptsRemaining] = useState<number | null>(null)
+  const [attemptsRemaining, setAttemptsRemaining] = useState<number>(MAX_ATTEMPTS)
   const [lockoutEnd, setLockoutEnd] = useState<Date | null>(null)
   const [lockoutCountdown, setLockoutCountdown] = useState<string>("")
 
   useEffect(() => {
-    const errorParam = searchParams.get("error")
-    if (errorParam) {
-      setError(decodeURIComponent(errorParam))
+    const savedAttempts = localStorage.getItem(`login_attempts_${email}`)
+    if (savedAttempts) {
+      const parsed = JSON.parse(savedAttempts)
+      if (parsed.email === email) {
+        if (parsed.lockoutEnd && new Date(parsed.lockoutEnd) > new Date()) {
+          setLockoutEnd(new Date(parsed.lockoutEnd))
+        } else {
+          setAttemptsRemaining(parsed.remaining || MAX_ATTEMPTS)
+          if (parsed.lockoutEnd && new Date(parsed.lockoutEnd) <= new Date()) {
+            localStorage.removeItem(`login_attempts_${email}`)
+          }
+        }
+      }
     }
-  }, [searchParams])
+  }, [email])
 
   useEffect(() => {
     if (!lockoutEnd) return
@@ -67,6 +77,7 @@ function LoginForm() {
         setLockoutEnd(null)
         setLockoutCountdown("")
         setAttemptsRemaining(MAX_ATTEMPTS)
+        localStorage.removeItem(`login_attempts_${email}`)
       } else {
         const minutes = Math.floor(diff / 60)
         const seconds = diff % 60
@@ -77,29 +88,22 @@ function LoginForm() {
     updateCountdown()
     const interval = setInterval(updateCountdown, 1000)
     return () => clearInterval(interval)
-  }, [lockoutEnd])
+  }, [lockoutEnd, email])
 
-  const checkLoginAllowed = async (email: string) => {
-    try {
-      const response = await fetch(`/api/auth/check-login?email=${encodeURIComponent(email)}`)
-      const result = await response.json()
-      
-      if (result.lockedAt) {
-        const lockoutEndTime = new Date(result.lockedAt)
-        if (lockoutEndTime > new Date()) {
-          setLockoutEnd(lockoutEndTime)
-          return { allowed: false, error: "Account is locked due to too many failed attempts." }
-        }
-      }
-
-      const remaining = MAX_ATTEMPTS - (result.failedAttempts || 0)
-      setAttemptsRemaining(Math.max(0, remaining))
-      
-      return { allowed: true, error: null }
-    } catch {
-      return { allowed: true, error: null }
-    }
+  const saveAttemptState = (remaining: number, lockout: Date | null) => {
+    localStorage.setItem(`login_attempts_${email}`, JSON.stringify({
+      email,
+      remaining,
+      lockoutEnd: lockout?.toISOString() || null
+    }))
   }
+
+  useEffect(() => {
+    const errorParam = searchParams.get("error")
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam))
+    }
+  }, [searchParams])
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,13 +116,6 @@ function LoginForm() {
     setError("")
     setLoading(true)
 
-    const loginCheck = await checkLoginAllowed(email)
-    if (!loginCheck.allowed) {
-      setError(loginCheck.error || "Login not allowed")
-      setLoading(false)
-      return
-    }
-
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -126,42 +123,31 @@ function LoginForm() {
       })
 
       if (signInError) {
-        console.log("Sign in failed:", signInError.message)
+        const newRemaining = attemptsRemaining - 1
+        const newLockout = getLockoutEnd(MAX_ATTEMPTS - newRemaining)
         
-        try {
-          await fetch("/api/auth/check-login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, success: false })
-          })
-          console.log("Recorded failed attempt")
-        } catch (e) {
-          console.error("Failed to record attempt:", e)
-        }
-
-        const attemptsResponse = await fetch(`/api/auth/check-login?email=${encodeURIComponent(email)}`)
-        const attemptsResult = await attemptsResponse.json()
-        console.log("Attempts result:", attemptsResult)
+        setAttemptsRemaining(Math.max(0, newRemaining))
         
-        const failedCount = attemptsResult.failedAttempts || 0
-        const remaining = MAX_ATTEMPTS - failedCount
-
-        if (remaining <= 3) {
-          setError(`${signInError.message}. ${getAttemptsRemainingText(remaining)}`)
+        if (newLockout) {
+          setLockoutEnd(newLockout)
+          saveAttemptState(0, newLockout)
+          setError(`Too many failed attempts. Account locked for ${newLockout > new Date(Date.now() + 300000) ? "15" : newLockout > new Date(Date.now() + 60000) ? "5" : "1"} minutes`)
         } else {
-          setError(signInError.message)
+          saveAttemptState(newRemaining, null)
+          if (newRemaining <= 3) {
+            setError(`${signInError.message}. ${getAttemptsRemainingText(newRemaining)}`)
+          } else {
+            setError(signInError.message)
+          }
         }
-        setAttemptsRemaining(remaining)
+        
         setLoading(false)
         return
       }
 
       if (data.user) {
-        await fetch("/api/auth/check-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, success: true })
-        })
+        localStorage.removeItem(`login_attempts_${email}`)
+        setAttemptsRemaining(MAX_ATTEMPTS)
 
         const { data: profile } = await supabase
           .from("user_profiles")
@@ -177,7 +163,6 @@ function LoginForm() {
           setMfaQrUri(uri)
           setStep("mfa-setup")
         }
-        setAttemptsRemaining(MAX_ATTEMPTS)
       }
     } catch (err) {
       setError("An unexpected error occurred")
