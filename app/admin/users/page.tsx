@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Trash2, Loader2, Users, ArrowLeft, Shield } from "lucide-react"
+import { Plus, Trash2, Loader2, Users, ArrowLeft, Shield, Unlock, Upload, Download } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
@@ -18,6 +18,8 @@ interface UserProfile {
   role: string
   can_view_all: boolean
   created_at: string
+  failed_attempts?: number
+  locked_at?: string
 }
 
 export default function UsersPage() {
@@ -115,6 +117,50 @@ export default function UsersPage() {
     }
   }
 
+  const handleUnlockUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to unlock this user?")) {
+      return
+    }
+
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "unlock" }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || "Failed to unlock user")
+      }
+
+      setSuccess("User unlocked successfully!")
+      fetchUsers()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  const handleExportUsers = () => {
+    const headers = ["Email", "Role", "Can View All", "Created", "Locked"]
+    const rows = users.map(u => [
+      u.email,
+      u.role,
+      u.can_view_all ? "Yes" : "No",
+      new Date(u.created_at).toLocaleDateString(),
+      u.locked_at ? "Yes" : "No"
+    ])
+    
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `users_${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -138,10 +184,16 @@ export default function UsersPage() {
               <CardTitle>Users</CardTitle>
               <CardDescription>Manage user accounts and permissions</CardDescription>
             </div>
-            <Button onClick={() => setShowAddModal(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExportUsers}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <Button onClick={() => setShowAddModal(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -155,7 +207,7 @@ export default function UsersPage() {
                     <tr className="border-b bg-muted/50">
                       <th className="p-3 text-left text-sm font-medium">Email</th>
                       <th className="p-3 text-left text-sm font-medium">Role</th>
-                      <th className="p-3 text-left text-sm font-medium">Can View All</th>
+                      <th className="p-3 text-left text-sm font-medium">Status</th>
                       <th className="p-3 text-left text-sm font-medium">Created</th>
                       <th className="p-3 text-left text-sm font-medium">Actions</th>
                     </tr>
@@ -165,23 +217,44 @@ export default function UsersPage() {
                       <tr key={user.id} className="border-b hover:bg-muted/50">
                         <td className="p-3">{user.email}</td>
                         <td className="p-3">
-                          <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                          <Badge variant={user.role === "admin" ? "default" : user.role === "read_only" ? "outline" : "secondary"}>
                             {user.role}
                           </Badge>
                         </td>
-                        <td className="p-3">{user.can_view_all ? "Yes" : "No"}</td>
+                        <td className="p-3">
+                          {user.locked_at ? (
+                            <Badge variant="destructive">Locked</Badge>
+                          ) : user.failed_attempts && user.failed_attempts > 0 ? (
+                            <Badge variant="outline">{user.failed_attempts} failed</Badge>
+                          ) : (
+                            <Badge variant="default">Active</Badge>
+                          )}
+                        </td>
                         <td className="p-3">
                           {new Date(user.created_at).toLocaleDateString()}
                         </td>
                         <td className="p-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            {user.locked_at && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUnlockUser(user.id)}
+                                title="Unlock user"
+                              >
+                                <Unlock className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="text-destructive hover:text-destructive"
+                              title="Delete user"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}

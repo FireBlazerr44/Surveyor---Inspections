@@ -8,8 +8,29 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Building2, Shield, Loader2, AlertCircle, Copy, CheckCircle } from "lucide-react"
+import { Building2, Shield, Loader2, AlertCircle, Copy } from "lucide-react"
 import { generateSecretForUser } from "@/lib/mfa"
+
+const PASSWORD_MIN_LENGTH = 8
+const PASSWORD_COMPLEXITY_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/
+
+function validatePassword(password: string): { valid: boolean; errors: string[] } {
+  const errors: string[] = []
+  
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    errors.push(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+  }
+  if (!PASSWORD_COMPLEXITY_REGEX.test(password)) {
+    errors.push("Password must include uppercase, lowercase, number, and special character")
+  }
+  
+  const commonPasswords = ["password", "123456", "qwerty", "admin", "letmein", "welcome"]
+  if (commonPasswords.some(p => password.toLowerCase().includes(p))) {
+    errors.push("Password is too common")
+  }
+  
+  return { valid: errors.length === 0, errors }
+}
 
 function LoginForm() {
   const router = useRouter()
@@ -18,15 +39,17 @@ function LoginForm() {
   
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [step, setStep] = useState<"credentials" | "mfa" | "mfa-setup">("credentials")
+  const [step, setStep] = useState<"credentials" | "mfa" | "mfa-setup" | "register">("credentials")
   const [mfaCode, setMfaCode] = useState("")
   const [mfaLoading, setMfaLoading] = useState(false)
   const [mfaSecret, setMfaSecret] = useState("")
   const [mfaQrUri, setMfaQrUri] = useState("")
   const [mfaSetupLoading, setMfaSetupLoading] = useState(false)
   const [setupError, setSetupError] = useState("")
+  const [isRegisterMode, setIsRegisterMode] = useState(false)
 
   useEffect(() => {
     const errorParam = searchParams.get("error")
@@ -35,42 +58,112 @@ function LoginForm() {
     }
   }, [searchParams])
 
+  const checkLoginAllowed = async (email: string) => {
+    try {
+      const response = await fetch("/api/auth/check-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      })
+      const result = await response.json()
+      if (result.error) {
+        return { allowed: false, error: result.error }
+      }
+      return { allowed: true, error: null }
+    } catch {
+      return { allowed: true, error: null }
+    }
+  }
+
+  const recordFailedAttempt = async (email: string) => {
+    try {
+      await fetch("/api/auth/check-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, failed: true })
+      })
+    } catch {}
+  }
+
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setLoading(true)
 
-    try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-
-      if (signInError) {
-        setError(signInError.message)
+    if (isRegisterMode) {
+      const validation = validatePassword(password)
+      if (!validation.valid) {
+        setError(validation.errors.join(". "))
         setLoading(false)
         return
       }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match")
+        setLoading(false)
+        return
+      }
+    }
 
-      if (data.user) {
-        const { data: profile } = await supabase
-          .from("user_profiles")
-          .select("mfa_enabled, mfa_secret")
-          .eq("id", data.user.id)
-          .single()
+    const loginCheck = await checkLoginAllowed(email)
+    if (!loginCheck.allowed) {
+      setError(loginCheck.error)
+      setLoading(false)
+      return
+    }
 
-        if (profile?.mfa_enabled && profile?.mfa_secret) {
-          setStep("mfa")
-        } else {
+    try {
+      if (isRegisterMode) {
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password
+        })
+
+        if (signUpError) {
+          setError(signUpError.message)
+          setLoading(false)
+          return
+        }
+
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
           const { secret, uri } = generateSecretForUser(email)
           setMfaSecret(secret)
           setMfaQrUri(uri)
           setStep("mfa-setup")
         }
-        setLoading(false)
+      } else {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+
+        if (signInError) {
+          await recordFailedAttempt(email)
+          setError(signInError.message)
+          setLoading(false)
+          return
+        }
+
+        if (data.user) {
+          const { data: profile } = await supabase
+            .from("user_profiles")
+            .select("mfa_enabled, mfa_secret")
+            .eq("id", data.user.id)
+            .single()
+
+          if (profile?.mfa_enabled && profile?.mfa_secret) {
+            setStep("mfa")
+          } else {
+            const { secret, uri } = generateSecretForUser(email)
+            setMfaSecret(secret)
+            setMfaQrUri(uri)
+            setStep("mfa-setup")
+          }
+        }
       }
     } catch (err) {
       setError("An unexpected error occurred")
+    } finally {
       setLoading(false)
     }
   }
@@ -160,18 +253,32 @@ function LoginForm() {
     setSetupError("")
   }
 
+  const toggleRegisterMode = () => {
+    setIsRegisterMode(!isRegisterMode)
+    setError("")
+    setPassword("")
+    setConfirmPassword("")
+  }
+
+  const getFormTitle = () => {
+    if (step === "mfa-setup") return "Set Up Two-Factor Authentication"
+    if (step === "mfa") return "Two-Factor Authentication"
+    if (isRegisterMode) return "Create Account"
+    return "Sign In"
+  }
+
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle>
-          {step === "credentials" ? "Sign In" : step === "mfa-setup" ? "Set Up Two-Factor Authentication" : "Two-Factor Authentication"}
-        </CardTitle>
+        <CardTitle>{getFormTitle()}</CardTitle>
         <CardDescription>
-          {step === "credentials" 
-            ? "Enter your credentials to access the inspection database"
-            : step === "mfa-setup"
+          {step === "mfa-setup"
             ? "Scan this QR code with your authenticator app, then enter the code"
-            : "Enter the authentication code from your authenticator app"
+            : step === "mfa"
+            ? "Enter the authentication code from your authenticator app"
+            : isRegisterMode
+            ? "Create your account to access the inspection database"
+            : "Enter your credentials to access the inspection database"
           }
         </CardDescription>
       </CardHeader>
@@ -198,30 +305,50 @@ function LoginForm() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{isRegisterMode ? "Password" : "Password"}</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder={isRegisterMode ? "Min 8 chars, uppercase, lowercase, number, special" : "Enter your password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete="current-password"
+                autoComplete={isRegisterMode ? "new-password" : "current-password"}
               />
             </div>
+            {isRegisterMode && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={loading || !email || !password}
+              disabled={loading || !email || !password || (isRegisterMode && !confirmPassword)}
             >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              {isRegisterMode ? "Create Account" : "Sign In"}
             </Button>
-            <p className="text-sm text-muted-foreground text-center">
-              Contact the administrator if you need access.
-            </p>
+            <div className="flex flex-col items-center gap-2">
+              <button 
+                type="button"
+                className="text-sm text-muted-foreground hover:text-foreground"
+                onClick={toggleRegisterMode}
+              >
+                {isRegisterMode ? "Already have an account? Sign In" : "Don't have an account? Register"}
+              </button>
+            </div>
           </CardFooter>
         </form>
       ) : step === "mfa-setup" ? (
