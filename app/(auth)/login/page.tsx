@@ -126,8 +126,23 @@ function LoginForm() {
       })
 
       if (signInError) {
+        console.log("Sign in failed:", signInError.message)
+        
+        try {
+          await fetch("/api/auth/check-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, success: false })
+          })
+          console.log("Recorded failed attempt")
+        } catch (e) {
+          console.error("Failed to record attempt:", e)
+        }
+
         const attemptsResponse = await fetch(`/api/auth/check-login?email=${encodeURIComponent(email)}`)
         const attemptsResult = await attemptsResponse.json()
+        console.log("Attempts result:", attemptsResult)
+        
         const failedCount = attemptsResult.failedAttempts || 0
         const remaining = MAX_ATTEMPTS - failedCount
 
