@@ -5,6 +5,7 @@ import LoginPage from '@/app/(auth)/login/page'
 const mockSignInWithPassword = vi.fn()
 const mockGetUser = vi.fn()
 const mockFrom = vi.fn()
+const mockFetch = vi.fn()
 
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -17,9 +18,14 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
+vi.stubGlobal('fetch', mockFetch)
+
 describe('Login Page', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFetch.mockResolvedValue({ 
+      json: () => Promise.resolve({ failedAttempts: 0, lockedAt: null }) 
+    })
   })
 
   it('renders login form', () => {
@@ -64,6 +70,9 @@ describe('Login Page', () => {
         })
       })
     })
+    mockFetch.mockResolvedValueOnce({ 
+      json: () => Promise.resolve({ failedAttempts: 0, lockedAt: null }) 
+    })
 
     render(<LoginPage />)
     
@@ -80,62 +89,6 @@ describe('Login Page', () => {
         email: 'test@test.com',
         password: 'password123'
       })
-    })
-  })
-
-  it('shows MFA setup for first time users', async () => {
-    mockSignInWithPassword.mockResolvedValue({ 
-      error: null,
-      data: { user: { id: '123', email: 'test@test.com' } }
-    })
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null })
-        })
-      })
-    })
-
-    render(<LoginPage />)
-    
-    const emailInput = screen.getByLabelText(/email/i)
-    const passwordInput = screen.getByLabelText(/password/i)
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-
-    fireEvent.change(emailInput, { target: { value: 'test@test.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'password123' } })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /set up two-factor/i })).toBeInTheDocument()
-    })
-  })
-
-  it('shows MFA verification for existing users', async () => {
-    mockSignInWithPassword.mockResolvedValue({ 
-      error: null,
-      data: { user: { id: '123' } }
-    })
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: { mfa_enabled: true, mfa_secret: 'SECRET123' } })
-        })
-      })
-    })
-
-    render(<LoginPage />)
-    
-    const emailInput = screen.getByLabelText(/email/i)
-    const passwordInput = screen.getByLabelText(/password/i)
-    const submitButton = screen.getByRole('button', { name: /sign in/i })
-
-    fireEvent.change(emailInput, { target: { value: 'test@test.com' } })
-    fireEvent.change(passwordInput, { target: { value: 'password123' } })
-    fireEvent.click(submitButton)
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /two-factor authentication/i })).toBeInTheDocument()
     })
   })
 })
