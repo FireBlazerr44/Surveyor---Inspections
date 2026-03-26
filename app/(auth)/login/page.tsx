@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Building2, Shield, Loader2, AlertCircle, Copy } from "lucide-react"
+import { Building2, Shield, Loader2, AlertCircle, Copy, Lock, KeyRound } from "lucide-react"
 import { generateSecretForUser } from "@/lib/mfa"
 
 const MAX_ATTEMPTS = 5
@@ -148,6 +149,8 @@ function LoginForm() {
       if (data.user) {
         localStorage.removeItem(`login_attempts_${email}`)
         setAttemptsRemaining(MAX_ATTEMPTS)
+        setLockoutEnd(null)
+        setError("")
 
         const { data: profile } = await supabase
           .from("user_profiles")
@@ -277,13 +280,36 @@ function LoginForm() {
           <CardContent className="space-y-4">
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md flex items-center gap-2" role="alert">
-                <AlertCircle className="w-4 h-4" />
-                {error}
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             )}
             {lockoutCountdown && (
-              <div className="p-3 text-sm bg-destructive/20 text-destructive rounded-md text-center font-mono">
-                Locked for {lockoutCountdown}
+              <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Lock className="w-5 h-5 text-destructive" />
+                  <span className="font-medium text-destructive">Account Locked</span>
+                </div>
+                <div className="text-center text-3xl font-mono font-bold text-destructive">
+                  {lockoutCountdown}
+                </div>
+                <p className="text-xs text-center text-muted-foreground mt-2">
+                  Too many failed login attempts
+                </p>
+              </div>
+            )}
+            {!lockoutEnd && attemptsRemaining < MAX_ATTEMPTS && (
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-muted">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Login attempts:</span>
+                </div>
+                <Badge 
+                  variant={attemptsRemaining <= 1 ? "destructive" : attemptsRemaining <= 2 ? "outline" : "secondary"}
+                  className="font-mono"
+                >
+                  {attemptsRemaining} / {MAX_ATTEMPTS}
+                </Badge>
               </div>
             )}
             <div className="space-y-2">
