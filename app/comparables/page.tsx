@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Search, Download, Loader2, MapPin } from "lucide-react"
 import Link from "next/link"
 import type { Property, Inspection } from "@/types"
+import { formatDate } from "@/lib/utils"
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 3959
@@ -277,7 +278,7 @@ export default function ComparablesPage({ searchParams }: { searchParams: Promis
                             : "N/A"}
                         </td>
                         <td className="p-3">{comp.inspection?.status || "N/A"}</td>
-                        <td className="p-3">{comp.inspection?.inspection_date || "N/A"}</td>
+                        <td className="p-3">{formatDate(comp.inspection?.inspection_date) || "N/A"}</td>
                         {radius !== "same_postcode" && (
                           <td className="p-3">
                             {comp.distance !== undefined ? `${comp.distance.toFixed(2)} mi` : "N/A"}

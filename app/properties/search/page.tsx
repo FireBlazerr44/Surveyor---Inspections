@@ -21,6 +21,14 @@ export default async function PropertySearchPage({
     redirect("/login")
   }
 
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  const userRole = profile?.role || "user"
+
   const params = await searchParams
   const search = params.search || ""
   const typeFilter = params.type || ""
@@ -172,6 +180,7 @@ export default async function PropertySearchPage({
           </CardContent>
         </Card>
 
+        {userRole !== "read_only" && (
         <div className="mt-4 flex justify-end">
           <Link href="/properties/new">
             <Button variant="outline">
@@ -180,6 +189,7 @@ export default async function PropertySearchPage({
             </Button>
           </Link>
         </div>
+        )}
       </main>
     </div>
   )

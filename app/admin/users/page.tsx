@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Trash2, Loader2, Users, ArrowLeft, Shield, Unlock, Upload, Download } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { formatDate } from "@/lib/utils"
+import { DashboardHeader } from "@/components/dashboard-header"
 
 interface UserProfile {
   id: string
@@ -32,6 +34,9 @@ export default function UsersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [userEmail, setUserEmail] = useState("")
+  const [userRole, setUserRole] = useState("admin")
+  const [isAdmin, setIsAdmin] = useState(true)
 
   useEffect(() => {
     fetchUsers()
@@ -43,6 +48,10 @@ export default function UsersPage() {
       router.push("/login")
       return
     }
+
+    setUserEmail(user.email || "")
+    setUserRole("admin")
+    setIsAdmin(true)
 
     const { data: profile } = await supabase
       .from("user_profiles")
@@ -147,7 +156,7 @@ export default function UsersPage() {
       u.email,
       u.role,
       u.can_view_all ? "Yes" : "No",
-      new Date(u.created_at).toLocaleDateString(),
+      formatDate(u.created_at),
       u.locked_at ? "Yes" : "No"
     ])
     
@@ -163,20 +172,8 @@ export default function UsersPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <Shield className="h-6 w-6" />
-            <h1 className="text-xl font-bold">User Management</h1>
-          </div>
-        </div>
-      </header>
-
+      <DashboardHeader userEmail={userEmail} userRole={userRole} isAdmin={isAdmin} />
+      
       <main className="container mx-auto px-4 py-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -231,7 +228,7 @@ export default function UsersPage() {
                           )}
                         </td>
                         <td className="p-3">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {formatDate(user.created_at)}
                         </td>
                         <td className="p-3">
                           <div className="flex gap-1">
@@ -294,15 +291,21 @@ export default function UsersPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label htmlFor="password">
+                      Default Password 
+                      <span className="text-muted-foreground font-normal ml-1">(for testing: letmein)</span>
+                    </Label>
                     <Input
                       id="password"
                       type="password"
                       value={newUser.password}
                       onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      placeholder="letmein"
                       required
-                      minLength={8}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      New users must change password on first login
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="role">Role</Label>

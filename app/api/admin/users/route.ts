@@ -80,11 +80,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email and password required" }, { status: 400 })
   }
 
-  const passwordValidation = validatePassword(password)
-  if (!passwordValidation.valid) {
-    return NextResponse.json({ error: passwordValidation.error }, { status: 400 })
-  }
-
   const { data: newUser, error } = await supabase.auth.admin.createUser({
     email,
     password,
@@ -96,10 +91,12 @@ export async function POST(request: Request) {
   }
 
   if (newUser?.user) {
-    await supabase.from("user_profiles").insert({
+    // Use upsert in case trigger already created the profile
+    await supabase.from("user_profiles").upsert({
       id: newUser.user.id,
       role: role || "user",
       can_view_all: role !== "read_only",
+      password_must_change: true,
     })
   }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,11 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Building2, Loader2 } from "lucide-react"
 import Link from "next/link"
 
-export default function NewPropertyPage() {
+export default function EditPropertyPage() {
   const router = useRouter()
+  const params = useParams()
   const supabase = createClient()
-  const [loading, setLoading] = useState(false)
+  const propertyId = params.id as string
+  
+  const [loading, setLoading] = useState(true)
   const [geocoding, setGeocoding] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     house_name: "",
@@ -27,9 +32,62 @@ export default function NewPropertyPage() {
     type: "",
     form: "",
     age: "",
+    notes: "",
     latitude: null as number | null,
     longitude: null as number | null,
   })
+
+  useEffect(() => {
+    const checkUserAndLoad = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push("/login")
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      const role = profile?.role || "user"
+      setUserRole(role)
+
+      if (role === "read_only") {
+        router.push("/properties/search")
+        return
+      }
+
+      // Load property data
+      const { data: property } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("id", propertyId)
+        .single()
+
+      if (property) {
+        setFormData({
+          house_name: property.house_name || "",
+          house_number: property.house_number || "",
+          street_name: property.street_name || "",
+          area: property.area || "",
+          town: property.town || "",
+          postcode: property.postcode || "",
+          type: property.type || "",
+          form: property.form || "",
+          age: property.age ? String(property.age) : "",
+          notes: property.notes || "",
+          latitude: property.latitude,
+          longitude: property.longitude,
+        })
+      }
+
+      setLoading(false)
+    }
+
+    checkUserAndLoad()
+  }, [router, supabase, propertyId])
 
   useEffect(() => {
     const geocodePostcode = async () => {
@@ -62,10 +120,10 @@ export default function NewPropertyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
+    setSubmitting(true)
 
     try {
-      const { error } = await supabase.from("properties").insert({
+      const { error } = await supabase.from("properties").update({
         house_name: formData.house_name || null,
         house_number: formData.house_number || null,
         street_name: formData.street_name || null,
@@ -75,18 +133,53 @@ export default function NewPropertyPage() {
         type: formData.type || null,
         form: formData.form || null,
         age: formData.age ? parseInt(formData.age) : null,
+        notes: formData.notes || null,
         latitude: formData.latitude,
         longitude: formData.longitude,
-      })
+      }).eq("id", propertyId)
 
+      if (error) throw error
+      router.push(`/properties/${propertyId}`)
+    } catch (error) {
+      console.error("Error updating property:", error)
+      alert("Failed to update property")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this property? This will also delete all associated inspections. This action cannot be undone.")) {
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.from("properties").delete().eq("id", propertyId)
       if (error) throw error
       router.push("/properties/search")
     } catch (error) {
-      console.error("Error creating property:", error)
-      alert("Failed to create property")
+      console.error("Error deleting property:", error)
+      alert("Failed to delete property")
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  if (userRole === "read_only") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p>Redirecting...</p>
+      </div>
+    )
   }
 
   return (
@@ -94,23 +187,22 @@ export default function NewPropertyPage() {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard">
+            <Link href={`/properties/${propertyId}`}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             <Building2 className="h-6 w-6" />
-            <h1 className="text-xl font-bold">Add New Property</h1>
+            <h1 className="text-xl font-bold">Edit Property</h1>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Property Details</CardTitle>
-              <CardDescription>Enter the property address and basic details</CardDescription>
+              <CardTitle>Address</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
@@ -133,7 +225,6 @@ export default function NewPropertyPage() {
                   />
                 </div>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="street_name">Street Name *</Label>
                 <Input
@@ -144,7 +235,6 @@ export default function NewPropertyPage() {
                   required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="area">Area</Label>
                 <Input
@@ -154,7 +244,6 @@ export default function NewPropertyPage() {
                   placeholder="Newtown"
                 />
               </div>
-
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="town">Town</Label>
@@ -183,7 +272,15 @@ export default function NewPropertyPage() {
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Property Details</CardTitle>
+              <CardDescription>Enter property specifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="type">Type *</Label>
@@ -223,28 +320,51 @@ export default function NewPropertyPage() {
                   </Select>
                 </div>
               </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="age">Year Built (1899-2026)</Label>
+                  <Input
+                    id="age"
+                    type="number"
+                    min="1899"
+                    max="2026"
+                    value={formData.age}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                    placeholder="1925"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Additional Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="age">Year Built (1899-2026)</Label>
-                <Input
-                  id="age"
-                  type="number"
-                  min="1899"
-                  max="2026"
-                  value={formData.age}
-                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
-                  placeholder="1925"
+                <Label htmlFor="notes">Notes</Label>
+                <textarea
+                  id="notes"
+                  className="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Additional notes about the property..."
                 />
               </div>
-
-              <div className="flex justify-end gap-4 pt-4">
-                <Link href="/dashboard">
-                  <Button type="button" variant="outline">Cancel</Button>
-                </Link>
-                <Button type="submit" disabled={loading}>
-                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Property
+              <div className="flex justify-between">
+                <Button type="button" variant="destructive" onClick={handleDelete} disabled={submitting}>
+                  Delete Property
                 </Button>
+                <div className="flex gap-4">
+                  <Link href={`/properties/${propertyId}`}>
+                    <Button type="button" variant="outline">Cancel</Button>
+                  </Link>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

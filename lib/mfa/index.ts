@@ -1,7 +1,7 @@
 import { generateSecret, generateURI, verify } from "otplib"
 import * as crypto from "crypto"
 
-const APP_NAME = "Surveyor Inspection"
+const APP_NAME = "Property Database"
 
 export function generateNewSecret(): string {
   return generateSecret()

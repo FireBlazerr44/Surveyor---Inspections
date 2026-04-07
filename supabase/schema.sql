@@ -35,6 +35,17 @@ CREATE TABLE IF NOT EXISTS inspections (
   user_id UUID REFERENCES auth.users(id),
   reference VARCHAR(10) UNIQUE,
   inspection_type VARCHAR(20),
+  floors TEXT,
+  location INTEGER,
+  condition VARCHAR(20),
+  living_rooms INTEGER,
+  bedrooms INTEGER,
+  bathrooms INTEGER,
+  cloaks INTEGER,
+  utility INTEGER,
+  garage VARCHAR(10),
+  conservatory INTEGER,
+  floor_area INTEGER,
   status VARCHAR(20),
   valuation DECIMAL(12,2),
   sale_price DECIMAL(12,2),
@@ -50,6 +61,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role VARCHAR(20) DEFAULT 'user',
   can_view_all BOOLEAN DEFAULT true,
+  password_must_change BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

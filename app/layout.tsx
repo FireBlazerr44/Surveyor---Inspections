@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Surveyor Inspection",
-  description: "Property inspection database management system",
+  title: "Michael Hornsby & Co",
+  description: "Property database management system",
 };
 
 export default function RootLayout({

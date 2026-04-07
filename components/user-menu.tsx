@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { LogOut, User, ChevronDown } from "lucide-react"
+import { LogOut, User, ChevronDown, Lock } from "lucide-react"
 import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
@@ -36,6 +36,11 @@ export function UserMenu({ email, role, onSignOut }: UserMenuProps) {
           <p className="text-sm font-medium truncate">{email}</p>
           <p className="text-xs text-muted-foreground capitalize">{role}</p>
         </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => router.push("/settings/password")}>
+          <Lock className="w-4 h-4 mr-2" />
+          Change Password
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onSignOut} className="text-destructive">
           <LogOut className="w-4 h-4 mr-2" />

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ClipboardList, Plus, Search, Home } from "lucide-react"
 import { DashboardHeader } from "@/components/dashboard-header"
+import { formatDate } from "@/lib/utils"
 
 export default async function DashboardPage({
   searchParams,
@@ -96,13 +97,14 @@ export default async function DashboardPage({
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Inspections</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Survey Records</CardTitle>
               <ClipboardList className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{totalInspections || 0}</div>
             </CardContent>
           </Card>
+          {userRole !== "read_only" && (
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Quick Actions</CardTitle>
@@ -111,7 +113,7 @@ export default async function DashboardPage({
               <Link href="/inspections/new">
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Inspection
+                  Add Survey Record
                 </Button>
               </Link>
               <Link href="/properties/search">
@@ -128,25 +130,41 @@ export default async function DashboardPage({
               </Link>
             </CardContent>
           </Card>
+          )}
+          {userRole === "read_only" && (
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="flex gap-4">
+              <Link href="/properties/search">
+                <Button variant="outline">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search Property
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+          )}
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Inspections</CardTitle>
-                <CardDescription>Latest property inspections</CardDescription>
+                <CardTitle>Recent Survey Records</CardTitle>
+                <CardDescription>Latest property survey records</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="mb-4 flex items-center gap-4">
                   <Link href={`/dashboard?view=${viewMode === "all" ? "mine" : "all"}&inspectionSearch=${inspectionSearch}`}>
                     <Button variant={viewMode === "all" ? "default" : "outline"} size="sm">
-                      All Inspections
+                      All Survey Records
                     </Button>
                   </Link>
                   <Link href={`/dashboard?view=${viewMode === "mine" ? "all" : "mine"}&inspectionSearch=${inspectionSearch}`}>
                     <Button variant={viewMode === "mine" ? "default" : "outline"} size="sm">
-                      My Inspections
+                      My Survey Records
                     </Button>
                   </Link>
                   <form className="flex-1">
@@ -170,10 +188,10 @@ export default async function DashboardPage({
                       <tr className="border-b bg-muted/50">
                         <th className="p-3 text-left text-sm font-medium">Reference</th>
                         <th className="p-3 text-left text-sm font-medium">Property</th>
-                        <th className="p-3 text-left text-sm font-medium">Type</th>
+                        <th className="p-3 text-left text-sm font-medium">Survey Type</th>
                         <th className="p-3 text-left text-sm font-medium">Status</th>
                         <th className="p-3 text-left text-sm font-medium">Valuation</th>
-                        <th className="p-3 text-left text-sm font-medium">Date</th>
+                        <th className="p-3 text-left text-sm font-medium">Survey Date</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -196,7 +214,7 @@ export default async function DashboardPage({
                             </Badge>
                           </td>
                           <td className="p-3">£{inspection.valuation?.toLocaleString()}</td>
-                          <td className="p-3">{inspection.inspection_date}</td>
+                          <td className="p-3">{formatDate(inspection.inspection_date)}</td>
                         </tr>
                       ))}
                     </tbody>

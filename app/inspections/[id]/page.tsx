@@ -4,13 +4,15 @@ import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ClipboardList, ArrowLeft, Building2, DollarSign, Calendar, FileText } from "lucide-react"
+import { ClipboardList, ArrowLeft, Building2, DollarSign, Calendar, FileText, Edit, Trash2 } from "lucide-react"
+import { formatDate } from "@/lib/utils"
+import { DeleteSurveyRecordButton } from "@/components/delete-inspection-button"
 
 interface PageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function InspectionDetailPage({ params }: PageProps) {
+export default async function SurveyRecordDetailPage({ params }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -47,7 +49,7 @@ export default async function InspectionDetailPage({ params }: PageProps) {
               </Button>
             </Link>
             <ClipboardList className="h-6 w-6" />
-            <h1 className="text-xl font-bold">Inspection Details</h1>
+            <h1 className="text-xl font-bold">Survey Record Details</h1>
           </div>
         </div>
       </header>
@@ -59,12 +61,21 @@ export default async function InspectionDetailPage({ params }: PageProps) {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle>Reference: {inspection.reference}</CardTitle>
-                  <Badge variant={inspection.status === "Completed" ? "default" : "secondary"}>
-                    {inspection.status}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={inspection.status === "Completed" ? "default" : "secondary"}>
+                      {inspection.status}
+                    </Badge>
+                    <Link href={`/inspections/${inspection.id}/edit`}>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                    </Link>
+                    <DeleteSurveyRecordButton surveyRecordId={inspection.id} />
+                  </div>
                 </div>
                 <CardDescription>
-                  {inspection.inspection_type} • Inspected on {inspection.inspection_date}
+                  {inspection.inspection_type} • Surveyed on {formatDate(inspection.inspection_date)}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -86,6 +97,55 @@ export default async function InspectionDetailPage({ params }: PageProps) {
                     <div className="text-2xl font-bold">
                       {inspection.price_per_sqm ? `£${inspection.price_per_sqm.toFixed(0)}` : "N/A"}
                     </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-4 mt-6 pt-6 border-t">
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Floors</span>
+                    <div className="font-medium">{inspection.floors || "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Location (1-10)</span>
+                    <div className="font-medium">{inspection.location || "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Condition</span>
+                    <div className="font-medium">{inspection.condition || "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Floor Area</span>
+                    <div className="font-medium">
+                      {inspection.floor_area ? `${inspection.floor_area} sq ft` : "N/A"}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Bedrooms</span>
+                    <div className="font-medium">{inspection.bedrooms ?? "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Bathrooms</span>
+                    <div className="font-medium">{inspection.bathrooms ?? "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Cloaks</span>
+                    <div className="font-medium">{inspection.cloaks ?? "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Living Rooms</span>
+                    <div className="font-medium">{inspection.living_rooms ?? "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Utility</span>
+                    <div className="font-medium">{inspection.utility ?? "N/A"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Garage</span>
+                    <div className="font-medium">{inspection.garage || "None"}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Conservatory</span>
+                    <div className="font-medium">{inspection.conservatory ?? "N/A"}</div>
                   </div>
                 </div>
 

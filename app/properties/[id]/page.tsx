@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Building2, ArrowLeft, Edit, Search, MapPin, Home, Ruler, Calendar, ExternalLink } from "lucide-react"
+import { formatDate } from "@/lib/utils"
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -17,6 +18,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
   if (!user) {
     redirect("/login")
   }
+
+  const { data: profile } = await supabase
+    .from("user_profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  const userRole = profile?.role || "user"
 
   const { id } = await params
 
@@ -175,11 +184,13 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     Search Comparables
                   </Button>
                 </Link>
+                {userRole !== "read_only" && (
                 <Link href={`/inspections/new?propertyId=${id}`} className="block">
                   <Button className="w-full">
                     Add Inspection
                   </Button>
                 </Link>
+                )}
               </CardContent>
             </Card>
 
@@ -207,7 +218,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                           </Badge>
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {inspection.inspection_type} • {inspection.inspection_date}
+                          {inspection.inspection_type} • {formatDate(inspection.inspection_date)}
                         </div>
                         <div className="text-sm font-medium mt-1">
                           £{inspection.valuation?.toLocaleString()}

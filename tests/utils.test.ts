@@ -46,7 +46,7 @@ describe('Property Types', () => {
 
 describe('Inspection Types', () => {
   it('matches inspection type values', () => {
-    const types = ['H2B Sale', 'H2B Repayment', 'SO Sale', 'SO Repayment', 'Sale', 'Valuation', 'Other']
+    const types = ['H2B Sale', 'H2B Repayment', 'SO Sale', 'SO Repayment', 'Sale', 'Valuation', 'Comparable', 'Other']
     types.forEach(type => expect(type).toBeDefined())
   })
 

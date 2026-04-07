@@ -39,11 +39,21 @@ export default function MFASetupPage() {
 
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("mfa_enabled")
+      .select("mfa_enabled, mfa_secret")
       .eq("id", user.id)
       .single()
 
-    setMfaEnabled(profile?.mfa_enabled || false)
+    const mfaEnabled = profile?.mfa_enabled || false
+    setMfaEnabled(mfaEnabled)
+    
+    // If MFA not enabled, auto-start setup
+    if (!mfaEnabled) {
+      const { secret: newSecret, uri } = generateSecretForUser(user.email || "")
+      setSecret(newSecret)
+      setQrUri(uri)
+      setSetupStep("generate")
+    }
+    
     setLoading(false)
   }
 
@@ -79,7 +89,7 @@ export default function MFASetupPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            action: "enable", 
+            action: "setup-enable", 
             secret,
             email: ""
           })
@@ -92,6 +102,10 @@ export default function MFASetupPage() {
           setSetupStep("done")
           setMfaEnabled(true)
           setSuccess("Two-factor authentication has been enabled!")
+          // Redirect to dashboard after a short delay
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 2000)
         } else {
           setError(enableResult.error || "Failed to enable MFA")
         }

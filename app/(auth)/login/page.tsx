@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { Building2, Shield, Loader2, AlertCircle, Copy, Lock, KeyRound } from "lucide-react"
+import { Building2, Shield, Loader2, AlertCircle, Copy, Lock, KeyRound, HelpCircle } from "lucide-react"
 import { generateSecretForUser } from "@/lib/mfa"
 
 const MAX_ATTEMPTS = 5
@@ -152,13 +152,23 @@ function LoginForm() {
         setLockoutEnd(null)
         setError("")
 
-        const { data: profile } = await supabase
+        // Check password_must_change flag from database
+        const { data: profile, error: profileError } = await supabase
           .from("user_profiles")
-          .select("mfa_enabled, mfa_secret")
+          .select("mfa_enabled, mfa_secret, password_must_change")
           .eq("id", data.user.id)
           .single()
 
-        if (profile?.mfa_enabled && profile?.mfa_secret) {
+        const needsPasswordChange = profile && !profileError && profile.password_must_change === true
+
+        if (needsPasswordChange) {
+          router.push("/settings/password?force=true")
+          return
+        }
+
+        const hasMfa = profile && !profileError && profile.mfa_secret && profile.mfa_enabled === true
+        
+        if (hasMfa) {
           setStep("mfa")
         } else {
           const { secret, uri } = generateSecretForUser(email)
@@ -207,7 +217,7 @@ function LoginForm() {
         const enableResult = await enableResponse.json()
 
         if (enableResult.success) {
-          router.push("/dashboard")
+          router.push("/search")
         } else {
           setSetupError(enableResult.error || "Failed to enable MFA")
         }
@@ -240,7 +250,7 @@ function LoginForm() {
       const result = await response.json()
 
       if (result.valid) {
-        router.push("/dashboard")
+        router.push("/search")
       } else {
         setError("Invalid authentication code. Please try again.")
       }
@@ -351,6 +361,16 @@ function LoginForm() {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
             </Button>
+            <div className="flex justify-center">
+              <button 
+                type="button"
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+                onClick={() => router.push("/forgot-password")}
+              >
+                <HelpCircle className="w-4 h-4" />
+                Forgot Password?
+              </button>
+            </div>
             <p className="text-sm text-muted-foreground text-center">
               Contact the administrator if you need access.
             </p>
@@ -486,7 +506,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
             <Building2 className="w-10 h-10 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold">Surveyor Inspection</h1>
+          <h1 className="text-2xl font-bold">Michael Hornsby & Co</h1>
         </div>
         
         <Suspense fallback={

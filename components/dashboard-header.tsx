@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Building2, Shield } from "lucide-react"
+import { Building2, Shield, Search, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { UserMenu } from "@/components/user-menu"
@@ -39,10 +39,22 @@ export function DashboardHeader({ userEmail, userRole, isAdmin }: DashboardHeade
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
             <Building2 className="w-5 h-5 text-primary-foreground" />
           </div>
-          <h1 className="text-lg font-semibold">Surveyor Inspection</h1>
+          <h1 className="text-lg font-semibold">Michael Hornsby & Co</h1>
         </div>
         
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="h-9">
+                <Search className="w-4 h-4 mr-2" />
+                <span>Comparables</span>
+              </Button>
+            </Link>
+            <Link href="/dashboard">
+              <Button variant="ghost" size="sm" className="h-9">
+                <ClipboardList className="w-4 h-4 mr-2" />
+                <span>Maintenance</span>
+              </Button>
+            </Link>
           {isAdmin && (
             <Link href="/admin/users">
               <Button variant="outline" size="sm" className="h-9 border-border bg-card/50 hover:bg-card hover:text-secondary text-foreground">

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, ClipboardList, Loader2, Search, Building2 } from "lucide-react"
 import Link from "next/link"
+import { LocationSlider } from "@/components/location-slider"
 import type { Property } from "@/types"
 
 export default function NewInspectionPage({ searchParams }: { searchParams: Promise<{ propertyId?: string }> }) {
@@ -26,6 +27,17 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
   const [formData, setFormData] = useState({
     reference: "",
     inspection_type: "",
+    floors: "",
+    location: "5",
+    condition: "Average",
+    living_rooms: "1",
+    bedrooms: "1",
+    bathrooms: "1",
+    cloaks: "0",
+    utility: "0",
+    garage: "None",
+    conservatory: "0",
+    floor_area: "",
     status: "Completed",
     valuation: "",
     sale_price: "",
@@ -82,7 +94,7 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
     try {
       const { data: { user } } = await supabase.auth.getUser()
       
-      const floorArea = selectedProperty.floor_area || 1
+      const floorArea = formData.floor_area ? parseFloat(formData.floor_area) : 1
       const valuation = parseFloat(formData.valuation) || 0
       const calculatedPricePerSqm = formData.price_per_sqm ? parseFloat(formData.price_per_sqm) : (valuation / floorArea)
 
@@ -91,6 +103,17 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
         user_id: user?.id,
         reference: formData.reference,
         inspection_type: formData.inspection_type || null,
+        floors: formData.floors || null,
+        location: parseInt(formData.location),
+        condition: formData.condition,
+        living_rooms: parseInt(formData.living_rooms),
+        bedrooms: parseInt(formData.bedrooms),
+        bathrooms: parseInt(formData.bathrooms),
+        cloaks: parseInt(formData.cloaks),
+        utility: parseInt(formData.utility),
+        garage: formData.garage,
+        conservatory: parseInt(formData.conservatory),
+        floor_area: formData.floor_area ? parseInt(formData.floor_area) : null,
         status: formData.status || null,
         valuation: formData.valuation ? parseFloat(formData.valuation) : null,
         sale_price: formData.sale_price ? parseFloat(formData.sale_price) : null,
@@ -102,19 +125,14 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
       if (error) throw error
       router.push("/dashboard")
     } catch (error) {
-      console.error("Error creating inspection:", error)
-      alert("Failed to create inspection")
+      console.error("Error creating survey record:", error)
+      alert("Failed to create survey record")
     } finally {
       setSubmitting(false)
     }
   }
 
-  const generateReference = () => {
-    const prefix = "INS"
-    const num = Math.floor(Math.random() * 9000) + 1000
-    return `${prefix}${num}`
-  }
-
+  
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -126,7 +144,7 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
               </Button>
             </Link>
             <ClipboardList className="h-6 w-6" />
-            <h1 className="text-xl font-bold">New Inspection</h1>
+            <h1 className="text-xl font-bold">New Survey Record</h1>
           </div>
         </div>
       </header>
@@ -223,32 +241,22 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
 
             <Card>
               <CardHeader>
-                <CardTitle>Inspection Details</CardTitle>
-                <CardDescription>Enter inspection information</CardDescription>
+                <CardTitle>Survey Record Details</CardTitle>
+                <CardDescription>Enter survey record information</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="reference">Reference *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="reference"
-                        value={formData.reference}
-                        onChange={(e) => setFormData({ ...formData, reference: e.target.value.toUpperCase() })}
-                        placeholder="INS0001"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setFormData({ ...formData, reference: generateReference() })}
-                      >
-                        Generate
-                      </Button>
-                    </div>
+                    <Input
+                      id="reference"
+                      value={formData.reference}
+                      onChange={(e) => setFormData({ ...formData, reference: e.target.value.toUpperCase() })}
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="inspection_type">Inspection Type</Label>
+                    <Label htmlFor="inspection_type">Survey Type</Label>
                     <Select
                       value={formData.inspection_type}
                       onValueChange={(value) => setFormData({ ...formData, inspection_type: value })}
@@ -263,7 +271,137 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
                         <SelectItem value="SO Repayment">SO Repayment</SelectItem>
                         <SelectItem value="Sale">Sale</SelectItem>
                         <SelectItem value="Valuation">Valuation</SelectItem>
+                        <SelectItem value="Comparable">Comparable</SelectItem>
                         <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="floors">Floors</Label>
+                    <Input
+                      id="floors"
+                      value={formData.floors}
+                      onChange={(e) => setFormData({ ...formData, floors: e.target.value })}
+                      placeholder="2"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <LocationSlider
+                      value={parseInt(formData.location)}
+                      onChange={(value) => setFormData({ ...formData, location: String(value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="condition">Condition</Label>
+                    <Select
+                      value={formData.condition}
+                      onValueChange={(value) => setFormData({ ...formData, condition: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Poor">Poor</SelectItem>
+                        <SelectItem value="Average">Average</SelectItem>
+                        <SelectItem value="Good">Good</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bedrooms">Bedrooms</Label>
+                    <Input
+                      id="bedrooms"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.bedrooms}
+                      onChange={(e) => setFormData({ ...formData, bedrooms: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="bathrooms">Bathrooms</Label>
+                    <Input
+                      id="bathrooms"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.bathrooms}
+                      onChange={(e) => setFormData({ ...formData, bathrooms: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="living_rooms">Living Rooms</Label>
+                    <Input
+                      id="living_rooms"
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={formData.living_rooms}
+                      onChange={(e) => setFormData({ ...formData, living_rooms: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cloaks">Cloaks</Label>
+                    <Input
+                      id="cloaks"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.cloaks}
+                      onChange={(e) => setFormData({ ...formData, cloaks: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="utility">Utility</Label>
+                    <Input
+                      id="utility"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.utility}
+                      onChange={(e) => setFormData({ ...formData, utility: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="conservatory">Conservatory</Label>
+                    <Input
+                      id="conservatory"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={formData.conservatory}
+                      onChange={(e) => setFormData({ ...formData, conservatory: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="garage">Garage</Label>
+                    <Select
+                      value={formData.garage}
+                      onValueChange={(value) => setFormData({ ...formData, garage: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="None">None</SelectItem>
+                        <SelectItem value="PS">PS - Parking Space</SelectItem>
+                        <SelectItem value="CP">CP - Car Port</SelectItem>
+                        <SelectItem value="GGE">GGE - Garage</SelectItem>
+                        <SelectItem value="DG">DG - Double Garage</SelectItem>
+                        <SelectItem value="TP">TP - Triple Garage</SelectItem>
+                        <SelectItem value="O">O - Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -288,7 +426,7 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="inspection_date">Inspection Date</Label>
+                    <Label htmlFor="inspection_date">Survey Date</Label>
                     <Input
                       id="inspection_date"
                       type="date"
@@ -298,7 +436,17 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="floor_area">Floor Area (sq ft)</Label>
+                    <Input
+                      id="floor_area"
+                      type="number"
+                      value={formData.floor_area}
+                      onChange={(e) => setFormData({ ...formData, floor_area: e.target.value })}
+                      placeholder="0"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="valuation">Valuation (£)</Label>
                     <Input
@@ -326,19 +474,19 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
                       type="number"
                       value={formData.price_per_sqm}
                       onChange={(e) => setFormData({ ...formData, price_per_sqm: e.target.value })}
-                      placeholder="Auto-calculated"
+                      placeholder="0"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
+                  <Label htmlFor="notes">Survey Notes</Label>
                   <textarea
                     id="notes"
                     className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    placeholder="Inspection notes..."
+                    placeholder="Survey notes..."
                   />
                 </div>
 
@@ -348,7 +496,7 @@ export default function NewInspectionPage({ searchParams }: { searchParams: Prom
                   </Link>
                   <Button type="submit" disabled={!selectedProperty || submitting}>
                     {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create Inspection
+                    Create Survey Record
                   </Button>
                 </div>
               </CardContent>
